@@ -43,3 +43,22 @@ r = [0 0 0 0 0 0 1 2 3 4 5 0]
 alpha = 0.95
 
 x = (eye(12) - alpha * Pf0) \ r'
+
+
+v_prev = zeros(12,1)
+v = zeros(12,1)
+
+M = 1000
+m = 0
+eps = 0.1
+
+while M - m > eps
+  for i = 1:12
+    v(i) = max(0, (i-6) + alpha .* (P0(i,:) * v_prev))
+  end
+
+  M = max(v - v_prev)
+  m = min(v - v_prev)
+  
+  v_prev = v
+end
