@@ -83,7 +83,7 @@ f_prev = NaN(1,12);
 while any(f != f_prev)
   % Derive the transitions and rewards given the policy
   Pf = policyToTransitions(f);
-  r = policyToRewards(f)
+  r = policyToRewards(f);
   
   % Solve the functional equation.
   v = (eye(12) - alpha * Pf) \ r';
