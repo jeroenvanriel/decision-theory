@@ -2,7 +2,6 @@ import gym
 import numpy as np
 from queue import Queue
 from random import random, choice
-from collections import defaultdict
 
 env = gym.make('FrozenLake-v1', desc=["SFFF", "FHFH", "FFFH", "HFFG"])
 
