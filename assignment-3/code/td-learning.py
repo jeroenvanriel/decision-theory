@@ -41,6 +41,8 @@ alpha = 0.5
 
 sma = SMA(1000)
 
+# sarsa: on-policy TD control
+
 n = 0
 while True:
     G = 0
