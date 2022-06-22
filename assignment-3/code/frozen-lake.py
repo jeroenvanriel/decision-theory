@@ -2,6 +2,7 @@ import gym
 import numpy as np
 from queue import Queue
 from random import random, choice
+from .sma import SMA
 
 env = gym.make('FrozenLake-v1', desc=["SFFF", "FHFH", "FFFH", "HFFG"])
 
@@ -48,22 +49,6 @@ def generate_episode(policy):
 
     return state_actions, rewards
 
-class SMA:
-    """Simple moving average with incremental update."""
-    def __init__(self, k):
-        self.q = Queue(k)
-        self.k = k
-        self.SMA = 0
-
-    def put(self, p):
-        if self.q.full():
-            self.SMA += (p - self.q.get()) / self.k
-        else:
-            self.SMA += p / self.k
-        self.q.put(p)
-
-    def get(self):
-        return self.SMA
 
 # on-policy Monte Carlo control
 
