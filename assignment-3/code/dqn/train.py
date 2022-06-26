@@ -2,7 +2,10 @@ import gym, torch, cv2
 import numpy as np
 from collections import deque
 from datetime import datetime
-from gym.wrappers import TransformObservation, FrameStack
+from gym.wrappers import TransformObservation, FrameStack, RecordVideo
+
+from gym import logger
+logger.set_level(logger.INFO)
 
 # for logging in azure machine learning studio
 from azureml.core import Run
@@ -22,53 +25,60 @@ def preprocess(frame):
     frame = frame.astype('float') / 255 # scale pixels
     return frame
 
+class FrameSkip(gym.Wrapper):
+    def __init__(self, env, frames):
+        super().__init__(env)
+        self.env = env
+        self.frames = frames
+
+    def step(self, action):
+        reward = 0
+        for _ in range(self.frames):
+            s, r, done, info = self.env.step(action)
+            reward += r
+            if done:
+                break
+
+        return s, reward, done, info
+
 env = gym.make('ALE/Breakout-v5')
+env.metadata['render.modes'] = env.metadata.get('render_modes', []) # fix a gym bug
+env = RecordVideo(env, 'outputs/', episode_trigger=lambda x: x % 200 == 0)
 env = TransformObservation(env, preprocess)
-# env = FrameStack(env, num_stack=4) # we implement this manually
+env = FrameSkip(env, 4)
+env = FrameStack(env, num_stack=4)
 
 from agent import Agent
 
 if __name__ == "__main__":
     EPISODES = 10000
-    MEMORY_SIZE = 50000 # steps
-    MIN_MEMORY = 10000 # steps
-    bs = 32
-    lr = 0.0001
-    gamma = 0.99
+    MEMORY_SIZE = 10000 # steps
+    MIN_MEMORY = 64 # steps
+    bs = 64
+    lr = 5e-5
+    gamma = 0.95
     agent = Agent(env, lr, gamma, MEMORY_SIZE, MIN_MEMORY, bs, DEV)
  
-    frame_skip = 4
-
     reward_sma = deque(maxlen=100) # simple moving average
 
     total_step = 0 # number of steps over all episodes
     for episode in range(EPISODES):
-        s_next = env.reset()
-        # stack the 'last' 4 frames
-        sk = np.stack((s_next, s_next, s_next, s_next))
+        s = env.reset()
 
         total_reward = 0
         total_loss = 0
         total_max_q = 0
-        for t in range(100000): # max number of emulation steps
-
-            if t % frame_skip != 0:
-                # skip frame and take same action
-                s_next, r, done, _ = env.step(a)
-                total_reward += r
-                continue
-
-            sk = np.stack((s_next, sk[0], sk[1], sk[2]))
-            a = agent.get_action(sk)
+        for t in range(100000): # max number of actual emulation steps
+            a = agent.get_action(s)
             s_next, r, done, _ = env.step(a)
-            sk_next = np.stack((s_next, sk[0], sk[1], sk[2]))
-            agent.store(sk, a, r, sk_next, done)
+            agent.store(s, a, r, s_next, done)
 
             loss, max_q = agent.train()
 
-            total_reward += r
             total_loss += loss
             total_max_q += max_q
+            total_reward += r
+
             total_step += 1
             if total_step % 1000 == 0:
                 agent.epsilon = max(0.01, agent.epsilon * 0.99)
@@ -77,19 +87,24 @@ if __name__ == "__main__":
                 agent.update_target_dqn()
 
                 # periodic model saving
-                if total_step > MIN_MEMORY and episode % 50 == 0:
+                if total_step > MIN_MEMORY and episode % 200 == 0:
                     print('saving models')
-                    torch.save(agent.target_dqn, f'outputs/target-{episode}.pt')
+                    # torch.save(agent.target_dqn, f'outputs/target-{episode}.pt')
                     torch.save(agent.online_dqn, f'outputs/online-{episode}.pt')
                     print('saved!')
 
+                # debugging
+                # print(f'opt: {agent.opt_exp_count}')
+                # print(f'mem: {len(agent.memory)}')
+
                 # logging
                 reward_sma.append(total_reward)
+                avg_max_q = total_max_q / t
                 run.log('reward', total_reward)
                 run.log('reward_sma', np.mean(reward_sma))
                 run.log('loss', total_loss)
-                run.log('avg_max_q', total_max_q / t)
+                run.log('avg_max_q', avg_max_q)
                 run.log('epsilon', agent.epsilon)
-                print(f'[{get_time()}] episode: {episode} reward: {int(total_reward)} reward_sma: {np.mean(reward_sma):.3f} loss: {total_loss:.3f} avg_max_q: {(total_max_q / t):.3f} epsilon: {agent.epsilon:.2f} last_step: {t} total_step: {total_step}')
+                print(f'[{get_time()}] episode: {episode} reward: {int(total_reward)} reward_sma: {np.mean(reward_sma):.3f} loss: {total_loss:.3f} avg_max_q: {avg_max_q:.3f} epsilon: {agent.epsilon:.2f} last_step: {t} total_step: {total_step}')
                 break
- 
+
