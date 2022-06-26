@@ -2,13 +2,13 @@ import torch
 import random
 import numpy as np
 from torch.optim import Adam
-from torch.nn.functional import mse_loss
+from torch.nn.functional import mse_loss, smooth_l1_loss
 from collections import deque
 
 from model import DQN, DQN1, DQN3
 
 def q_for_action(qs, actions):
-    """Get the q values from (64, 4) corresponding to the action."""
+    """Get the q values from (64, 3) corresponding to the action."""
     return qs.gather(1, actions.unsqueeze(1)).squeeze(1)
 
 class Agent:
@@ -16,8 +16,8 @@ class Agent:
         self.epsilon = 1
 
         self.dev = device
-        self.online_dqn = DQN(env.action_space.n).to(device).train()
-        self.target_dqn = DQN(env.action_space.n).to(device)
+        self.online_dqn = DQN(3).to(device).train()
+        self.target_dqn = DQN(3).to(device)
         self.target_dqn.load_state_dict(self.online_dqn.state_dict())
         self.target_dqn.eval()
 
@@ -51,11 +51,11 @@ class Agent:
     def get_action(self, state):
         if random.random() < self.epsilon:
             # choose random action
-            return random.choice(range(self.online_dqn.n_actions))
+            return random.choice(range(3))
         else:
             # return greedy action
             x = torch.unsqueeze(torch.from_numpy(np.asarray(state)), dim=0).float().to(self.dev)
-            return torch.argmax(self.online_dqn(x))
+            return torch.argmax(self.online_dqn(x)).item()
         
     def double_q_loss(self, s_b, a_b, r_b, s_next_b, done_b):
         # get q values for current states
@@ -84,7 +84,8 @@ class Agent:
             m, _ = torch.max(qnext, dim=-1)
             target = r_b + self.gamma * m * (1 - done_b)
         
-        return mse_loss(q_vals, target), q_vals
+        # return mse_loss(q_vals, target), q_vals
+        return smooth_l1_loss(q_vals, target), q_vals
     
     def train(self):
         if len(self.memory) < self.min_memory:

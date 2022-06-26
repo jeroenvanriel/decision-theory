@@ -1,4 +1,4 @@
-import gym, torch, cv2
+import gym, torch, cv2, random
 import numpy as np
 from collections import deque
 from datetime import datetime
@@ -30,30 +30,76 @@ class FrameSkip(gym.Wrapper):
         super().__init__(env)
         self.env = env
         self.frames = frames
+        self.lives = 5
 
     def step(self, action):
+        action = {0:0, 1:2, 2:3}[action] # map to NOPE, LEFT, RIGHT
         reward = 0
         for _ in range(self.frames):
             s, r, done, info = self.env.step(action)
+            lives_next = info['lives']
             reward += r
             if done:
                 break
 
+        if self.lives != lives_next and not done:
+            s, r, done, info = self.env.step(1) # FIRE to restart
+
         return s, reward, done, info
+    
+    def reset(self):
+        super().reset()
+        s, _, _, _ = self.env.step(1) # FIRE to start
+        return s
 
-env = gym.make('ALE/Breakout-v5')
-env.metadata['render.modes'] = env.metadata.get('render_modes', []) # fix a gym bug
-env = RecordVideo(env, 'outputs/', episode_trigger=lambda x: x % 200 == 0)
-env = TransformObservation(env, preprocess)
-env = FrameSkip(env, 4)
-env = FrameStack(env, num_stack=4)
+def wrap(env):
+    env = TransformObservation(env, preprocess)
+    env = FrameSkip(env, 2)
+    env = FrameStack(env, num_stack=4)
+    return env
 
-from agent import Agent
+env = wrap(gym.make('ALE/Breakout-v5'))
+
+# maximum number of emulation steps
+T_MAX = 100000
+
+# evaluation is done in a different environment, with recording enabled
+EVAL_INTERVAL = 100
+EVAL_EPISODES = 10
+env_eval = gym.make('ALE/Breakout-v5')
+env_eval.metadata['render.modes'] = env_eval.metadata.get('render_modes', []) # fix a gym bug
+vid = RecordVideo(env_eval, 'outputs/', episode_trigger=lambda: True)
+env_eval = wrap(vid)
+
+def evaluate(agent, episode):
+    epsilon = agent.epsilon
+    agent.epsilon = 0.05
+
+    rewards = []
+    for t in range(EVAL_EPISODES):
+        if t == 0: # big hack to only record first with the episode number
+            vid.episode_id = episode
+            vid.episode_trigger = lambda x: True
+        else:
+            vid.episode_trigger = lambda x: False
+        s = env_eval.reset()
+        reward = 0
+        for _ in range(T_MAX):
+            a = agent.get_action(s)
+            s, r, done, _ = env_eval.step(a)
+            reward += r
+            if done:
+                break
+        rewards.append(reward)
+
+    agent.epsilon = epsilon # reset back
+    return np.mean(rewards)
 
 if __name__ == "__main__":
+    from agent import Agent
     EPISODES = 10000
-    MEMORY_SIZE = 10000 # steps
-    MIN_MEMORY = 64 # steps
+    MEMORY_SIZE = 100000 # steps
+    MIN_MEMORY = 10000 # steps
     bs = 64
     lr = 5e-5
     gamma = 0.95
@@ -68,10 +114,11 @@ if __name__ == "__main__":
         total_reward = 0
         total_loss = 0
         total_max_q = 0
-        for t in range(100000): # max number of actual emulation steps
+        for t in range(T_MAX): # max number of actual emulation steps
             a = agent.get_action(s)
-            s_next, r, done, _ = env.step(a)
+            s_next, r, done, info = env.step(a)
             agent.store(s, a, r, s_next, done)
+            s = s_next
 
             loss, max_q = agent.train()
 
@@ -86,16 +133,15 @@ if __name__ == "__main__":
             if done: # end of episode
                 agent.update_target_dqn()
 
-                # periodic model saving
-                if total_step > MIN_MEMORY and episode % 200 == 0:
-                    print('saving models')
-                    # torch.save(agent.target_dqn, f'outputs/target-{episode}.pt')
+                # periodic evaluation and model saving
+                if total_step > MIN_MEMORY and episode % EVAL_INTERVAL == 0:
                     torch.save(agent.online_dqn, f'outputs/online-{episode}.pt')
-                    print('saved!')
+                    # torch.save(agent.target_dqn, f'outputs/target-{episode}.pt')
+                    print('model saved!')
 
-                # debugging
-                # print(f'opt: {agent.opt_exp_count}')
-                # print(f'mem: {len(agent.memory)}')
+                    reward_eval = evaluate(agent, episode)
+                    print(f'reward_eval: {reward_eval}')
+                    run.log('reward_eval', reward_eval)
 
                 # logging
                 reward_sma.append(total_reward)
@@ -107,4 +153,4 @@ if __name__ == "__main__":
                 run.log('epsilon', agent.epsilon)
                 print(f'[{get_time()}] episode: {episode} reward: {int(total_reward)} reward_sma: {np.mean(reward_sma):.3f} loss: {total_loss:.3f} avg_max_q: {avg_max_q:.3f} epsilon: {agent.epsilon:.2f} last_step: {t} total_step: {total_step}')
                 break
-
+ 
