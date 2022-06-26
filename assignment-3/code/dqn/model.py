@@ -1,5 +1,27 @@
 import torch.nn as nn
 
+class DQN(nn.Module):
+    def __init__(self, n_actions):
+        super().__init__()
+        self.n_actions = n_actions
+        self.model = nn.Sequential(
+            # 4 input frames
+            nn.Conv2d(4, 32, 8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, 4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, 3, stride=1),
+            nn.ReLU(),
+            nn.Conv2d(64, 1024, 7, stride=1),
+            nn.ReLU(),
+            nn.Flatten(),
+            nn.Linear(1024, n_actions),
+        )
+
+    def forward(self, x):
+        return self.model(x)
+
+
 class DQN1(nn.Module):
     def __init__(self, n_actions):
         super().__init__()
@@ -17,8 +39,8 @@ class DQN1(nn.Module):
             nn.ReLU(),
             nn.Linear(512, n_actions),
         )
-        for i in [0, 2, 4, 7, 9]:
-            nn.init.xavier_uniform(self.model[i].weight)
+        # for i in [0, 2, 4, 7, 9]:
+        #     nn.init.xavier_uniform(self.model[i].weight)
 
     def forward(self, x):
         return self.model(x)
@@ -42,6 +64,30 @@ class DQN2(nn.Module):
             nn.LazyLinear(256),
             nn.ReLU(),
             nn.Linear(256, n_actions),
+        )
+
+    def forward(self, x):
+        return self.model(x)
+
+class DQN3(nn.Module):
+    def __init__(self, n_actions):
+        super().__init__()
+        self.n_actions = n_actions
+        self.model = nn.Sequential(
+            # 4 input frames (84, 84)
+            nn.Conv2d(4, 32, 8),
+            nn.MaxPool2d(2, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, 4),
+            nn.MaxPool2d(2, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, 3),
+            nn.MaxPool2d(2, stride=2),
+            nn.ReLU(),
+            nn.Flatten(),
+            nn.Linear(7 * 7 * 64, 512),
+            nn.ReLU(),
+            nn.Linear(512, n_actions),
         )
 
     def forward(self, x):
