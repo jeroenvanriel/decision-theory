@@ -8,8 +8,8 @@ from gym import logger
 logger.set_level(logger.INFO)
 
 # for logging in azure machine learning studio
-from azureml.core import Run
-run = Run.get_context()
+#from azureml.core import Run
+#run = Run.get_context()
 
 DEV = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'using device {DEV}')
@@ -44,12 +44,15 @@ class FrameSkip(gym.Wrapper):
 
         if self.lives != lives_next and not done:
             s, r, done, info = self.env.step(1) # FIRE to restart
+            s, r, done, info = self.env.step(1) # FIRE again to prevent hanging
+            self.lives = lives_next
 
         return s, reward, done, info
     
     def reset(self):
         super().reset()
-        s, _, _, _ = self.env.step(1) # FIRE to start
+        s, _, _, info = self.env.step(1) # FIRE to start
+        self.lives = 5
         return s
 
 def wrap(env):
@@ -61,7 +64,8 @@ def wrap(env):
 env = wrap(gym.make('ALE/Breakout-v5'))
 
 # maximum number of emulation steps
-T_MAX = 100000
+# emulator itself stops around 13500
+T_MAX = 1000
 
 # evaluation is done in a different environment, with recording enabled
 EVAL_INTERVAL = 100
@@ -73,7 +77,7 @@ env_eval = wrap(vid)
 
 def evaluate(agent, episode):
     epsilon = agent.epsilon
-    agent.epsilon = 0.05
+    agent.epsilon = 0
 
     rewards = []
     for t in range(EVAL_EPISODES):
@@ -100,6 +104,7 @@ if __name__ == "__main__":
     EPISODES = 10000
     MEMORY_SIZE = 100000 # steps
     MIN_MEMORY = 10000 # steps
+    epsilon_step = 1 / EPISODES
     bs = 64
     lr = 5e-5
     gamma = 0.95
@@ -125,13 +130,12 @@ if __name__ == "__main__":
             total_loss += loss
             total_max_q += max_q
             total_reward += r
-
             total_step += 1
-            if total_step % 1000 == 0:
-                agent.epsilon = max(0.01, agent.epsilon * 0.99)
     
             if done: # end of episode
-                agent.update_target_dqn()
+                if total_step >= MIN_MEMORY:
+                    agent.epsilon -= epsilon_step
+                    agent.update_target_dqn()
 
                 # periodic evaluation and model saving
                 if total_step > MIN_MEMORY and episode % EVAL_INTERVAL == 0:
@@ -141,16 +145,16 @@ if __name__ == "__main__":
 
                     reward_eval = evaluate(agent, episode)
                     print(f'reward_eval: {reward_eval}')
-                    run.log('reward_eval', reward_eval)
+                    #run.log('reward_eval', reward_eval)
 
                 # logging
                 reward_sma.append(total_reward)
                 avg_max_q = total_max_q / t
-                run.log('reward', total_reward)
-                run.log('reward_sma', np.mean(reward_sma))
-                run.log('loss', total_loss)
-                run.log('avg_max_q', avg_max_q)
-                run.log('epsilon', agent.epsilon)
+                #run.log('reward', total_reward)
+                #run.log('reward_sma', np.mean(reward_sma))
+                #run.log('loss', total_loss)
+                #run.log('avg_max_q', avg_max_q)
+                #run.log('epsilon', agent.epsilon)
                 print(f'[{get_time()}] episode: {episode} reward: {int(total_reward)} reward_sma: {np.mean(reward_sma):.3f} loss: {total_loss:.3f} avg_max_q: {avg_max_q:.3f} epsilon: {agent.epsilon:.2f} last_step: {t} total_step: {total_step}')
                 break
  
