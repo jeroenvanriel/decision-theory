@@ -1,0 +1,153 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usepackage{titling}
+\setlength{\droptitle}{-3em}
+\usepackage[a4paper, total={6in, 10in}]{geometry}
+
+\title{Assignment 1 --- Markov Decision Theory}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace{-5em}
+
+\noindent
+\textit{Please provide brief but careful motivations of your answers.}
+
+\section*{Problem 1 -- Unreliable Machine}
+
+Suppose we have a machine for making computer chips.
+When the machine is in \textit{excellent} condition, it produces two cips per day, but
+a failure might occur with probability 0.1. 
+When this happens, all chips produced on that day are damaged.
+After failure, an \textit{emergency repair} is necessary during the night to get the machine running again the next day, but such fix leaves the machine in \textit{good} condition.
+Whenever the machine is not in excellent condition, it can only produce one chip per day.
+A machine in good condition fails with probability 0.3, which results in \textit{poor} condition the next day.
+Machines in poor condition are very unreliable, as they break down with probability 0.6, but their condition cannot degrade further.
+
+It is possible to put the machine back into excellent condition by executing a \textit{full maintenance} procedure, which takes two full days.
+Your task is to determine when to deploy this procedure in order to maximize the total output of five days.
+
+
+\vspace{1em}
+\noindent
+\textbf{(a)}
+Formalize the above problem as a Markov decision problem. Make sure to specify
+\begin{itemize}
+    \item the state space $\mathcal{I}$,
+    \item the action space $\mathcal{A}$,
+    \item direct rewards $r^{a}(\cdot)$,
+    \item final rewards $q(\cdot)$,
+    \item transition probabilities $p^{a}(\cdot, \cdot)$.
+\end{itemize}
+
+\vspace{1em}
+\noindent
+\textbf{(b)}
+Suppose our machine is currently in excellent condition.
+Formulate the optimal maintenance strategy for five days and calculate corresponding maximum expected number of undamaged chips that are produced under this strategy.
+
+
+\section*{Problem 2 -- Capacity Scaling}
+
+Consider a queue that holds jobs to be processed on a machine.
+We assume that the system operates in discrete time slots.
+Let $A(t)$ denote the number of jobs arriving to the queue during time slot $t = 1, 2, \dots$.
+
+\begin{figure}[h!]
+    \centering
+\begin{tikzpicture}[>=latex]
+% the rectangle with vertical rules
+\draw (0,-0.3) -- ++(50pt,0) -- ++(0,-0.90cm) -- ++(-50pt,0);
+\foreach \i in {0,...,4}
+  \draw (\i*10pt,-0.3) -- +(0,-0.90cm);
+
+% the circle
+\draw (2.75,-0.75cm) circle [radius=0.75cm];
+
+% the arrows and labels
+\draw[->] (3.6,-0.75) -- +(20pt,0) node[right] {$R(t)$};
+\draw[<-] (-0.1,-0.75) -- +(-20pt,0) node[left] {$A(t)$};
+\end{tikzpicture}
+\label{queue}
+\end{figure}
+\vspace{0.5em}
+
+\noindent
+Arrivals are distributed identically and independently in each time slot as
+\begin{align*}
+    A(t) = \begin{cases}
+        0 & \text{w.p. } 0.5, \\
+        2 & \text{w.p. } 0.4, \\
+        5 & \text{w.p. } 0.1.
+    \end{cases}
+\end{align*}
+There is room for up to $Q_\text{max}=5$ jobs in the queue.
+When jobs arrive to a full queue, they are simply discarded.
+At the start of each time slot, we need to choose the \textit{service capacity} $R(t) \in \{ 0, 1, 2, 3 \}$ of the machine, which is the maximum number of jobs that can be handled during the time slot.
+More precisely, the evolution of the number of jobs in the queue is governed by
+\begin{align*}
+    Q(t + 1) = \min\{ \; \max \{ Q(t) - R(t), 0 \} + A(t) , \; Q_\text{max} \; \} .
+\end{align*}
+
+\noindent
+There are two types of cost associated with the system.
+Maintaining a queue of length $i$ during a time slot induces a \textit{holding cost} of 
+\begin{align*}
+    C_h(i) = \begin{cases}
+        i & \text{ for } i \in \{ 0, 1, 2 \}, \\
+        5 & \text{ for } i = 3, \\
+        7 & \text{ for } i = 4, \\
+        10 & \text{ for } i = 5. 
+    \end{cases}
+\end{align*}
+Furthermore, the \textit{service cost} associated with choosing service capacity $R(t) = r$ is given by
+\begin{align*}
+    C_s(r) = \begin{cases}
+        0 & \text{ for } r = 0 , \\
+        0.5 & \text{ for } r = 1 , \\
+        2.5 & \text{ for } r = 2 , \\
+        7.0 & \text{ for } r = 3 .
+    \end{cases}
+\end{align*}
+Our task is to determine a policy that minimizes the long-term average cost of operating this system.
+
+\vspace{1em}
+\noindent
+\textbf{(a)}
+Formalize the above queueing system as a Markov decision process.
+
+\vspace{1em}
+\noindent
+\textbf{(b)}
+Consider the decision rule $\mathbf{f_0}$ that picks $R(t) = 1$ in each time slot, no matter the state of the system.
+Compute the long-term average cost for this policy and provide relative rewards.
+
+\vspace{0.2em}
+\noindent
+\textit{Hint:} In order to solve an underdetermined linear system, you might want to use a least-squares method like \texttt{numpy.linalg.lstsq} or the $\backslash$ operator in Matlab.
+If you want, you could use Theorem~3.6.1 in the ``Advanced Stochastic Operations Research'' lecture notes to verify your answer.
+
+\vspace{1em}
+\noindent
+\textbf{(c)}
+Perform one step of policy improvement to obtain $\mathbf{f_1}$.
+
+\vspace{1em}
+\noindent
+\textbf{(d)}
+Use successive approximation to obtain an optimal policy and give the corresponding minimum long-term average operational cost.
+
+\vspace{1em}
+\noindent
+\textbf{(e)}
+Suppose that the condition of the system degrades heavily when the queue is at maximum capacity.
+Suppose we want to avoid having a full queue for more than 10\% of the time.
+Explain how you could formalize this requirement and indicate how an optimal policy under this constraint can be found.
+You do not have to compute the solution.
+
+
+\end{document}
