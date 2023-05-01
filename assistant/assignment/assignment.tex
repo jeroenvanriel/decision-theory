@@ -48,7 +48,7 @@ Formalize the above problem as a Markov decision problem. Make sure to specify
 \noindent
 \textbf{(b)}
 Suppose our machine is currently in excellent condition.
-Formulate the optimal maintenance strategy for five days and calculate corresponding maximum expected number of undamaged chips that are produced under this strategy.
+Formulate the optimal maintenance strategy for five days and calculate the corresponding maximum expected number of undamaged chips that are produced under this strategy.
 
 
 \section*{Problem 2 -- Capacity Scaling}
@@ -56,6 +56,20 @@ Formulate the optimal maintenance strategy for five days and calculate correspon
 Consider a queue that holds jobs to be processed on a machine.
 We assume that the system operates in discrete time slots.
 Let $A(t)$ denote the number of jobs arriving to the queue during time slot $t = 1, 2, \dots$.
+Arrivals are distributed identically and independently in each time slot as
+\begin{align*}
+    A(t) = \begin{cases}
+        0 & \text{w.p. } 0.5, \\
+        2 & \text{w.p. } 0.4, \\
+        5 & \text{w.p. } 0.1.
+    \end{cases}
+\end{align*}
+
+
+\noindent
+There is room for up to $Q_\text{max}=5$ jobs in the queue.
+When jobs arrive to a full queue, they are simply discarded.
+At the start of each time slot, we need to choose the \textit{service capacity} $R(t) \in \{ 0, 1, 2, 3 \}$ of the machine, which is the maximum number of jobs that can be handled during the time slot.
 
 \begin{figure}[h!]
     \centering
@@ -77,17 +91,6 @@ Let $A(t)$ denote the number of jobs arriving to the queue during time slot $t =
 \vspace{0.5em}
 
 \noindent
-Arrivals are distributed identically and independently in each time slot as
-\begin{align*}
-    A(t) = \begin{cases}
-        0 & \text{w.p. } 0.5, \\
-        2 & \text{w.p. } 0.4, \\
-        5 & \text{w.p. } 0.1.
-    \end{cases}
-\end{align*}
-There is room for up to $Q_\text{max}=5$ jobs in the queue.
-When jobs arrive to a full queue, they are simply discarded.
-At the start of each time slot, we need to choose the \textit{service capacity} $R(t) \in \{ 0, 1, 2, 3 \}$ of the machine, which is the maximum number of jobs that can be handled during the time slot.
 More precisely, the evolution of the number of jobs in the queue is governed by
 \begin{align*}
     Q(t + 1) = \min\{ \; \max \{ Q(t) - R(t), 0 \} + A(t) , \; Q_\text{max} \; \} .
@@ -110,9 +113,10 @@ Furthermore, the \textit{service cost} associated with choosing service capacity
         0 & \text{ for } r = 0 , \\
         0.5 & \text{ for } r = 1 , \\
         2.5 & \text{ for } r = 2 , \\
-        7.0 & \text{ for } r = 3 .
+        7.0 & \text{ for } r = 3 ,
     \end{cases}
 \end{align*}
+regardless of whether all this capacity was actually used.
 Our task is to determine a policy that minimizes the long-term average cost of operating this system.
 
 \vspace{1em}
