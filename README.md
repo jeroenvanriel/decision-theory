@@ -6,4 +6,4 @@ This repository contains source code and files related to the following assignme
 - 3 Reinforcement Learning with Atari games
 - 4 Stochastic Programming
 
-Furthermore, the _assistant_ folder contains the assignment for the 2023 edition of the course that I designed and graded student assistant.
+Furthermore, the _assistant_ folder contains the assignment on MDPs for the 2023 edition of the course that I designed and graded as student assistant.
